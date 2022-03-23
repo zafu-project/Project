@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cesium App</title>
+    <script src="/js/jquery.min.js"></script>
+    <script src="/js/Cesium/Cesium.js"></script>
+    <link href="/js/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        *{
+            box-sizing: border-box;
+            padding: 0px;
+            margin: 0px;
+        }
+        #cesiumContainer {
+            width: inherit;
+            height: inherit;
+        }
+        .container{
+            width: 100%;
+            height: 730px;
+            display: flex;
+            flex-direction: row;
+        }
+        .leftContainer{
+            height: inherit;
+            flex: 1;
+        }
+        .rightContainer{
+            height: inherit;
+            flex: 1;
+            /*tip*/
+            font-family: '华文细黑';
+            font-size: 15px;
+            line-height: 1.5
+            /*letter-spacing:2px;    */
+        }
+        .innerContainer{
+            width: inherit;
+            height: inherit;
+            padding-left: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .infos{
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            /*border: 1px solid red;*/
+            /*tip*/
+            margin-top: 10px;
+            margin-right: 10px;
+            box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.16),0 2px 10px 0 rgba(0, 0, 0, 0.12)!important;
+
+            /*            font-size: 15px;
+                        line-height: 1.5  */
+        }
+        .info{
+            display: flex;
+            flex-direction: row;
+            /*tip*/
+            margin-top: 7px;
+            margin-left: 10px;
+            /*margin-bottom: 5px;*/
+        }
+        .info_title{
+            font-size:30px;
+            font-weight:bold;
+            margin-left: 10px;
+        }
+        .attr{
+            flex: 1;
+        }
+        .value{
+            flex: 10;
+        }
+        /*.icon_img{*/
+        /*    display: flex;*/
+        /*    flex-direction: row;*/
+        /*}*/
+        .icon_img img{
+            margin-top: 12px;
+            margin-left: 10px;
+            /*margin-bottom: 10px;*/
+            height:20px;
+        }
+        .control{
+            flex: 1.2;
+            /*border: 1px solid blue;            */
+            /*margin-left: 10px;*/
+        }
+        .buttons{
+            margin-top: 10px;
+        }
+        .slide_bars{
+            margin-top: 10px;
+            margin-left: 10px;
+        }
+        .button_x5{
+            height: 40px;
+            width: 80px;
+            margin-left: 10px;
+            color: #FFFFFF;
+            /*background-color: #73AD21;*/
+            background-color: #4CAF50;
+            box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.1), 0 2px 2px rgba(0, 0, 0, 0.24);
+            border: none;
+            cursor: hand;
+            outline: none;
+        }
+        .button_x5:hover{
+            color: #4CAF50;
+            background:white;
+            transition-duration: 0.3s, 0.15s, 0.3s, 0.3s;
+            transition-timing-function: ease, ease, ease, ease;
+            transition-delay: 0s, 0s, 0s, 0s;
+            /*background: black;*/
+            cursor: pointer;
+        }
+    </style>
+    <script>
+        function abs(figure){
+            if(figure < 0)
+                figure = -figure;
+            return figure;
+        }
+
+        function getHeight(longitude, latitude) {
+            let carto = new Cesium.Cartographic.fromDegrees(longitude, latitude); //输入经纬度
+            let h1 = viewer.scene.globe.getHeight(carto);
+            return h1
+        }
+
+        function changePosition(model, lon, lat, alt) {
+            //获取3Dtlies的bounds范围
+            let boundingSphere = model.boundingSphere;
+            //获取3Dtlies的范围中心点的弧度(原位置弧度制)
+            let cartographic = Cesium.Cartographic.fromCartesian(boundingSphere.center);
+            //定义3Dtlies改变之后中心点的弧度（目标位置弧度制）
+            let offsetvalue = Cesium.Cartographic.fromDegrees(lon, lat, alt) //-6378137
+            //从弧度算出模型的位置（角度制原位置）
+            let surface = Cesium.Cartesian3.fromRadians(cartographic.longitude, cartographic.latitude, cartographic.height);
+            //模型改变的位置（角度制目标位置）
+            let offset = Cesium.Cartesian3.fromRadians(offsetvalue.longitude, offsetvalue.latitude, offsetvalue.height);
+
+            let surfaceMatrix = Cesium.Matrix4.fromTranslation(surface)
+            let offsetMatrix = Cesium.Matrix4.fromTranslation(offset)
+            let translation = new Cesium.Matrix4()
+            Cesium.Matrix4.subtract(offsetMatrix, surfaceMatrix, translation)
+            let change = Cesium.Cartesian3.fromArray([translation[12], translation[13], translation[14]]);
+
+            translation = Cesium.Matrix4.fromTranslation(change);
+
+            //修改模型的位置
+            Cesium.Matrix4.multiply(translation, model.modelMatrix, model.modelMatrix)
+        }
+
+        function waitForHeight(longitude, latitude) {
+            return new Promise(function (resolve, reject) {
+                var thisResolve = resolve;
+                var interval = window.setInterval(function () {
+                    console.log(getHeight(longitude, latitude))
+                    height = getHeight(longitude, latitude)
+                    if(height != undefined && height >= 0) {
+                        window.clearInterval(interval)
+                        thisResolve(height)
+                    }
+                }, 1000)
+            })
+        }
+
+        function getModelInfo(_uuid){
+            var o
+            return new Promise(function (resolve, reject){
+                $.ajax({
+                    url: "/cesium",
+                    data: {"uuid" : _uuid},
+                    success: function(data) {
+                        o = JSON.parse(data);
+                        resolve(o)
+                    },
+                    error: function(err){
+                        console.log("/cesium request error")
+                    }
+                });
+            })
+        }
+
+        function getTreeInfo(_uuid){
+            var o
+            return new Promise(function (resolve, reject){
+                $.ajax({
+                    url: "/position",
+                    data: {"uuid" : _uuid},
+                    success: function(data) {
+                        o = JSON.parse(data);
+                        if(o == {})
+                            o = {ginkgo_biloba:[]}
+                        resolve(o)
+                    },
+                    error: function(err){
+                        console.log("/position request error")
+                    }
+                });
+            })
+        }
+
+        function getModifyValue(_uuid){
+            var o
+            return new Promise(function (resolve, reject){
+                $.ajax({
+                    url: "/modify",
+                    data: {"uuid" : _uuid},
+                    success: function(data) {
+                        o = JSON.parse(data);
+                        resolve(o)
+                    },
+                    error: function(err){
+                        console.log("/modify request error")
+                    }
+                });
+            })
+        }
+
+        //获得url中的参数
+        function request(strParame) {
+            var args = new Object();
+            var query = location.search.substring(1);
+
+            var pairs = query.split("&"); // Break at ampersand
+            for(var i = 0; i < pairs.length; i++) {
+                var pos = pairs[i].indexOf('=');
+                if (pos == -1) continue;
+                var argname = pairs[i].substring(0,pos);
+                var value = pairs[i].substring(pos+1);
+                value = decodeURIComponent(value);
+                args[argname] = value;
+            }
+            return args[strParame];
+        }
+
+        async function handle(uuid){
+            //从服务器获得模型信息以及树木信息
+            await getModelInfo(uuid).then(model=>{
+                modelData = model;
+            })
+            await getTreeInfo(uuid).then(tree=>{
+                treeData = tree;
+            })
+            await getModifyValue(uuid).then(modify=>{
+                modifyData = modify;
+            })
+            console.log(modelData);
+            console.log(treeData);
+            console.log(modifyData);
+            copyoriginModelLongitude = parseFloat(modelData.longitude)
+            copyoriginModelLatitude = parseFloat(modelData.latitude)
+
+            modelLongitude = parseFloat(modelData.longitude) + parseFloat(modifyData.dlongitude);
+            modelLatitude = parseFloat(modelData.latitude) + parseFloat(modifyData.dlatitude);
+            originModelLatitude = modelLatitude;
+            originModelLongitude = modelLongitude;
+            tilesetPath = modelData.gltfPath;
+
+            //定位到指定位置
+            viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(modelLongitude, modelLatitude, 200 + modelAltitude)
+            });
+
+            //等待高程加载
+            await waitForHeight(modelLongitude, modelLatitude).then(height=>{
+                copyoriginModelAltitude = height
+                modelAltitude = height + parseFloat(modifyData.daltitude);
+                originModelAltitude = modelAltitude;
+            });
+            console.log(modelAltitude)
+
+            //加载3DTiles
+            let position = Cesium.Cartesian3.fromDegrees(modelLongitude, modelLatitude, modelAltitude);
+            modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(position);
+            model = new Cesium.Cesium3DTileset({
+                url: tilesetPath,
+                modelMatrix: modelMatrix,
+            })
+            console.log(model.modelMatrix)
+            await model.readyPromise.then(function (model) {
+
+                viewer.scene.primitives.add(model);
+                //viewer.zoomTo(model, new Cesium.HeadingPitchRange(0.5, -0.2, model.boundingSphere.radius * 1.0));
+                console.log("boundingSphere: " + model.boundingSphere.center)
+
+                /*model.modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(modelLongitude,
+                    modelLatitude, modelAltitude));*/
+
+                //旋转矩阵
+                let m = model.modelMatrix;
+                let m1 = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(-90));
+                Cesium.Matrix4.multiplyByMatrix3(m, m1, m);
+                model.modelMatrix = m;
+
+                m = model.modelMatrix;
+                m1 = Cesium.Matrix3.fromRotationY(Cesium.Math.toRadians(parseFloat(modifyData.drotatey)));
+                Cesium.Matrix4.multiplyByMatrix3(m, m1, m);
+                model.modelMatrix = m;
+
+            }).otherwise(function (error) {
+                console.log(error);
+            });
+
+            //单体化
+            for(let i = 0; i < treeData.tree.length; i++){
+                let topLongitude = parseFloat(treeData.tree[i].top_longitude);
+                let topLatitude = parseFloat(treeData.tree[i].top_latitude);
+                let butLogitude = parseFloat(treeData.tree[i].but_longitude);
+                let butLatitude = parseFloat(treeData.tree[i].but_latitude);
+                let treeHeight = parseFloat(treeData.tree[i].height);
+                let name = treeData.tree[i].name;
+                let width = treeData.tree[i].width;
+
+
+                let center = new Cesium.Cartesian3.fromDegrees((topLongitude + butLogitude) / 2,
+                                                                (topLatitude + butLatitude) / 2,
+                                                                copyoriginModelAltitude);
+                var boxMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(center)
+                let obj = {
+                    id: "volume" + i,
+                    name: name,
+                    longitude: (topLongitude + butLogitude) / 2,
+                    latitude: (topLatitude + butLatitude) / 2,
+                    height: treeHeight,
+                    width: width
+                };
+
+                //将obj放入单体化信息
+                classificationData.push(obj);
+
+                viewer.scene.primitives.add(
+                    new Cesium.ClassificationPrimitive({
+                        geometryInstances: new Cesium.GeometryInstance({
+                            geometry: Cesium.BoxGeometry.fromDimensions({
+                                vertexFormat: Cesium.PerInstanceColorAppearance
+                                    .VERTEX_FORMAT,
+                                dimensions: new Cesium.Cartesian3(abs(topLongitude - butLogitude) * 110946, abs(topLatitude - butLatitude) * 110946, treeHeight / 2),
+                            }),
+                            modelMatrix: boxMatrix,
+                            attributes: {
+                                color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+                                    new Cesium.Color(Math.random(), Math.random(), Math.random(), 0.5)
+                                ),
+                                show: new Cesium.ShowGeometryInstanceAttribute(true),
+                            },
+                            id: obj.id,
+                        }),
+                        classificationType: Cesium.ClassificationType.CESIUM_3D_TILE,
+                    })
+                );
+            }
+
+
+            //设置鼠标事件
+
+            var currentObjectId;
+            var currentPrimitive;
+            var currentColor;
+            var currentShow;
+            var attributes;
+
+            var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+            handler.setInputAction(function (movement) {
+                var pickedObject = viewer.scene.pick(movement.endPosition);
+                if (Cesium.defined(pickedObject) && Cesium.defined(pickedObject.id)) {
+                    if (pickedObject.id === currentObjectId) {
+                        return;
+                    }
+
+                    if (Cesium.defined(currentObjectId)) {
+                        attributes = currentPrimitive.getGeometryInstanceAttributes(
+                            currentObjectId
+                        );
+                        attributes.color = currentColor;
+                        attributes.show = currentShow;
+                        currentObjectId = undefined;
+                        currentPrimitive = undefined;
+                        currentColor = undefined;
+                        currentShow = undefined;
+                    }
+                }
+
+                if (
+                    Cesium.defined(pickedObject) &&
+                    Cesium.defined(pickedObject.primitive) &&
+                    Cesium.defined(pickedObject.id) &&
+                    Cesium.defined(pickedObject.primitive.getGeometryInstanceAttributes)
+                ) {
+                    currentObjectId = pickedObject.id;
+                    currentPrimitive = pickedObject.primitive;
+                    attributes = currentPrimitive.getGeometryInstanceAttributes(
+                        currentObjectId
+                    );
+                    currentColor = attributes.color;
+                    currentShow = attributes.show;
+                    if (!viewer.scene.invertClassification) {
+                        attributes.color = [255, 255, 255, 128];
+                    }
+                    attributes.show = [1];
+
+                    //遍历寻找目标
+                    var o;
+                    for(obj in classificationData){
+                        if(classificationData[obj].id == pickedObject.id){
+                            o = classificationData[obj]
+                            break;
+                        }
+                    }
+                    /*TODO*/
+                    $("#treename").text(o.name);
+                    $("#treeheight").text(o.height + " m");
+                    $("#treewidth").text(o.width + " m");
+                    $("#treelongitude").text(o.longitude);
+                    $("#treelatitude").text(o.latitude);
+
+                    /*END TODO*/
+
+                } else if (Cesium.defined(currentObjectId)) {
+                    attributes = currentPrimitive.getGeometryInstanceAttributes(
+                        currentObjectId
+                    );
+                    attributes.color = currentColor;
+                    attributes.show = currentShow;
+                    currentObjectId = undefined;
+                    currentPrimitive = undefined;
+                    currentColor = undefined;
+                }
+            }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+            console.log(originModelLongitude)
+            console.log(originModelLatitude)
+            console.log(originModelAltitude)
+
+        }
+    </script>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="leftContainer">
+        <div id="cesiumContainer"></div>
+    </div>
+    <div class="rightContainer">
+        <!-- 控制台 -->
+        <div class="innerContainer">
+            <div class="infos">
+                <div class = "info_title">树木信息</div>
+                <div class="icon_img">
+                    <img src="icon_in3m6u3k6qi/shu6.png">
+                </div>
+                <div class="info">
+                    <div class="attr">
+                        种类：
+                    </div>
+                    <div class="value" id="treename">
+                        银杏树
+                    </div>
+                </div>
+                <div class="info">
+                    <div class="attr">
+                        树高：
+                    </div>
+                    <div class="value" id="treeheight">
+                        0
+                    </div>
+                </div>
+                <div class="info">
+                    <div class="attr">
+                        冠幅：
+                    </div>
+                    <div class="value" id="treewidth">
+                        0
+                    </div>
+                </div>
+                <div class="icon_img">
+                    <img src="icon_in3m6u3k6qi/zuobiao.png">
+                </div>
+                <div class="info">
+                    <div class="attr">
+                        经度：
+                    </div>
+                    <div class="value" id="treelongitude">
+                        0
+                    </div>
+                </div>
+                <div class="info">
+                    <div class="attr">
+                        纬度：
+                    </div>
+                    <div class="value" id="treelatitude">
+                        0
+                    </div>
+                </div>
+            </div>
+            <div class="control">
+                <div class="icon_img">
+                    <img src="icon_in3m6u3k6qi/kongzhi.png">
+                </div>
+                <div class="buttons">
+                    <button class = "button_x5" onclick="latitudeAdd()">增加纬度</button>
+                    <button class = "button_x5" onclick="latitudeDecline()">减小纬度</button>
+                    <button class = "button_x5" onclick="longitudeAdd()">增加经度</button>
+                    <button class = "button_x5" onclick="longitudeDecline()">减小经度</button>
+                    <button class = "button_x5" onclick="lookAt()">定位至模型</button><br>
+                    <button class = "button_x5" onclick="checkout()">查看</button><br>
+
+                </div>
+                <div class="slide_bars">
+                    调整纬度: <input type="range" min="-500" max="500" id="latitude" style="width: 500px" oninput="changeLatitude()">
+                    <br>
+                    调整经度: <input type="range" min="-500" max="500" id="longitude" style="width: 500px" oninput="changeLongitude()">
+                    <br>
+                    调整高度: <input type="range" min="-500" max="500" id="height" style="width: 500px" oninput="changeHeight()">
+                    <br>
+                    X轴旋转  : <input type="range" min="-90" max="90" id="rotateX" style="width: 500px" oninput="rotate_X()"><br>
+                    Y轴旋转  : <input type="range" min="-90" max="90" id="rotateY" style="width: 500px" oninput="rotate_Y()"><br>
+                    Z轴旋转  : <input type="range" min="-90" max="90" id="rotateZ" style="width: 500px" oninput="rotate_Z()"><br>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    /**
+    * 变量：
+     * 3DTiles位置信息
+     * 树木位置信息
+    * */
+
+    /*
+    * 3DTiles位置信息类
+    * latitude
+    * longitude
+    * gltfPath
+    * */
+
+    /*
+    * 树木信息映射表
+    * but_latitude
+    * but_longitude
+    * height
+    * top_latitude
+    * top_longitude
+    * */
+
+    //全局3DTiles旋转角度变量
+    var angleX = 0;
+    var angleY = 0;
+    var angleZ = 0;
+
+    //全局3DTiles经纬度、高度变量、tileset文件位置
+    var modelLongitude = 0;
+    var modelLatitude = 0;
+    var modelAltitude = 0;
+    var originModelLongitude = 0;
+    var originModelLatitude = 0;
+    var originModelAltitude = 0;
+    var copyoriginModelLongitude = 0;
+    var copyoriginModelLatitude = 0;
+    var copyoriginModelAltitude = 0;
+    var tilesetPath = ""
+
+    //全局3DTiles指针
+    var model = null;
+
+    //全局3DTiles变换矩阵
+    var modelMatrix = null;
+
+    //Cesium Ion token
+    //这是作者个人的token，别拿来乱用哈>_<
+    var token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3YTYxYTkyMy1iYTVmLTQyYmUtOWU0Ny1mM2Y5NjBmOGViODciLCJpZCI6NDMwNDMsImlhdCI6MTYxMjE3NDc4NH0.BIBgf6-0iHxuWsmDccC5lEZPdPNgXkXE8uFUFo2tIYc";
+
+    //全局变量3DTiles位置信息、树木位置信息
+    var modelData = {};
+    var treeData = {};
+    var modifyData = {};
+
+    //单体化信息
+    var classificationData = [];
+
+    //Cesium.Ion.defaultAccessToken
+    Cesium.Ion.defaultAccessToken = token;
+
+    //Cesium地形
+    let terrain = Cesium.createWorldTerrain();
+
+    //初始化viewer
+    var viewer = new Cesium.Viewer("cesiumContainer", {
+        baseLayerPicker: false,
+        terrainProvider: terrain
+    })
+
+    //开启地下模式
+    viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
+
+    //当前3DTiles对应uuid
+    //test: 6759d119-1c1a-44e4-a00a-52ae6f4916b4
+    let uuid = request("uuid");
+    handle(uuid)
+
+
+
+</script>
+</body>
+<script>
+    function lookAt() {
+        //viewer.zoomTo(model, new Cesium.HeadingPitchRange(0.5, -0.2, model.boundingSphere.radius * 1.0));
+        viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(modelLongitude, modelLatitude, 200 + modelAltitude)
+        });
+    }
+
+    function latitudeAdd() {
+        let origin = modelLatitude
+        modelLatitude += 0.000009405717451407729
+        let after = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.fromDegrees(modelLongitude, modelLatitude, modelAltitude))
+        let first = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.fromDegrees(modelLongitude, origin, modelAltitude))
+        let translation = Cesium.Matrix4.subtract(after, first, new Cesium.Cartesian3())
+
+        let change = Cesium.Cartesian3.fromArray([translation[12], translation[13], translation[14]]);
+        translation = Cesium.Matrix4.fromTranslation(change);
+
+        Cesium.Matrix4.multiply(translation, model.modelMatrix, model.modelMatrix)
+    }
+
+    function latitudeDecline() {
+        let origin = modelLatitude
+        modelLatitude -= 0.000009405717451407729
+        let after = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.fromDegrees(modelLongitude, modelLatitude, modelAltitude))
+        let first = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.fromDegrees(modelLongitude, origin, modelAltitude))
+        let translation = Cesium.Matrix4.subtract(after, first, new Cesium.Cartesian3())
+
+        let change = Cesium.Cartesian3.fromArray([translation[12], translation[13], translation[14]]);
+        translation = Cesium.Matrix4.fromTranslation(change);
+
+        Cesium.Matrix4.multiply(translation, model.modelMatrix, model.modelMatrix)
+    }
+
+    function longitudeAdd() {
+        let origin = modelLongitude
+        modelLongitude += 0.000008983152841195214
+        let after = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.fromDegrees(modelLongitude, modelLatitude, modelAltitude))
+        let first = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.fromDegrees(origin, modelLatitude, modelAltitude))
+        let translation = Cesium.Matrix4.subtract(after, first, new Cesium.Cartesian3())
+
+        let change = Cesium.Cartesian3.fromArray([translation[12], translation[13], translation[14]]);
+        translation = Cesium.Matrix4.fromTranslation(change);
+
+        Cesium.Matrix4.multiply(translation, model.modelMatrix, model.modelMatrix)
+    }
+
+    function longitudeDecline() {
+        let origin = modelLongitude
+        modelLongitude -= 0.000008983152841195214
+        let after = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.fromDegrees(modelLongitude, modelLatitude, modelAltitude))
+        let first = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.fromDegrees(origin, modelLatitude, modelAltitude))
+        let translation = Cesium.Matrix4.subtract(after, first, new Cesium.Cartesian3())
+
+        let change = Cesium.Cartesian3.fromArray([translation[12], translation[13], translation[14]]);
+        translation = Cesium.Matrix4.fromTranslation(change);
+
+        Cesium.Matrix4.multiply(translation, model.modelMatrix, model.modelMatrix)
+    }
+
+    function checkout() {
+        console.log("dlo: " + (modelLongitude - originModelLongitude));
+        console.log("dla: " + (modelLatitude - originModelLatitude));
+        console.log("da: " + (modelAltitude - originModelAltitude));
+        console.log("dx: " + angleX);
+        console.log("dy: " + angleY);
+        console.log("dz: " + angleZ);
+    }
+
+    function changeLatitude() {
+        let Lon = parseFloat($("#longitude").val());
+        let Lat = parseFloat($("#latitude").val());
+        let Height = parseFloat($("#height").val());
+
+        modelLongitude = originModelLongitude + Lon * 0.000008983152841195214;
+        modelLatitude = originModelLatitude + Lat * 0.000009405717451407729;
+        modelAltitude = originModelAltitude + Height * 1.0;
+
+        changePosition(model, modelLongitude,
+            modelLatitude,
+            modelAltitude);
+    }
+
+    function changeLongitude() {
+        let Lon = parseFloat($("#longitude").val());
+        let Lat = parseFloat($("#latitude").val());
+        let Height = parseFloat($("#height").val());
+
+        modelLongitude = originModelLongitude + Lon * 0.000008983152841195214;
+        modelLatitude = originModelLatitude + Lat * 0.000009405717451407729;
+        modelAltitude = originModelAltitude + Height * 1.0;
+
+        changePosition(model, modelLongitude,
+            modelLatitude,
+            modelAltitude);
+    }
+
+    function changeHeight() {
+        let Lon = parseFloat($("#longitude").val());
+        let Lat = parseFloat($("#latitude").val());
+        let Height = parseFloat($("#height").val());
+
+        modelLongitude = originModelLongitude + Lon * 0.000008983152841195214;
+        modelLatitude = originModelLatitude + Lat * 0.000009405717451407729;
+        modelAltitude = originModelAltitude + Height * 1.0;
+
+        changePosition(model, modelLongitude,
+            modelLatitude,
+            modelAltitude);
+    }
+
+    function rotate_X() {
+        let RotateX = $("#rotateX").val();
+        let rotate = RotateX - angleX
+        angleX = angleX + rotate
+        let m = model.modelMatrix;
+        let m1 = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(rotate));
+        Cesium.Matrix4.multiplyByMatrix3(m, m1, m);
+        model.modelMatrix = m;
+    }
+
+    function rotate_Y() {
+        let RotateY = $("#rotateY").val();
+        let rotate = RotateY - angleY
+        angleY = angleY + rotate
+        let m = model.modelMatrix;
+        let m1 = Cesium.Matrix3.fromRotationY(Cesium.Math.toRadians(rotate));
+        Cesium.Matrix4.multiplyByMatrix3(m, m1, m);
+        model.modelMatrix = m;
+    }
+
+    function rotate_Z() {
+        let RotateZ = $("#rotateZ").val();
+        let rotate = RotateZ - angleZ
+        angleZ = angleZ + rotate
+        let m = model.modelMatrix;
+        let m1 = Cesium.Matrix3.fromRotationZ(Cesium.Math.toRadians(rotate));
+        Cesium.Matrix4.multiplyByMatrix3(m, m1, m);
+        model.modelMatrix = m;
+    }
+</script>
+</html>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+ <trees>
+     <tree path="/node_modules/cesium" title="Cesiummmmmmmmmmmmmmmmmmm"/>
+     <tree path="/src/services/ant-design-pro/api.js" title="API" extension="js"/>
+     <tree path="/config/routes.js" title="路由结构" extension="js"/>
+   <tree path="/src/pages/Admin" title="用户管理"/>
+   <tree path="/src/pages/Cesium" title="Cesium 3D地图"/>
+   <tree path="/src/pages/Dashboard" title="仪表盘"/>
+   <tree path="/src/pages/user" title="登录"/>
+   <tree path="/src/app.jsx" title="拦截器" extension="jsx"/>
+   <tree path="/public/favicon.ico" title="Logo" extension="ico"/>
+   <tree path="/src/components" title="业务通用组件"/>
+   <tree path="/src/e2e" title="集成测试用例"/>
+  <tree path="/src/pages" title="业务页面入口"/>
+  <tree path="/src/services" title="后台接口服务"/>
+  <tree path="/mock" title="本地模拟数据"/>
+  <tree path="/config" title="umi 配置，包含路由，构建等配置"/>
+  <tree path="/src/global.less" title="全局样式" extension="less"/>
+  <tree path="/src/global.jsx" title="全局 JSX" extension="jsx"/>
+  <tree path="/tests" title="测试工具"/>
+  <tree path="/src/pages/Items/Projects/Tasks" title="任务"/>
+  <tree path="/src/pages/Items" title="项目"/>
+</trees>

@@ -1,0 +1,69 @@
+@import '~antd/es/style/themes/default.less';
+@import './utils/utils.less';
+
+.cardList {
+  .card {
+    :global {
+      .ant-card-meta-title {
+        margin-bottom: 12px;
+        & > a {
+          display: inline-block;
+          max-width: 100%;
+          color: @heading-color;
+        }
+      }
+      .ant-card-body:hover {
+        .ant-card-meta-title > a {
+          color: @primary-color;
+        }
+      }
+    }
+  }
+  .item {
+    height: 64px;
+  }
+
+  :global {
+    .ant-list .ant-list-item-content-single {
+      max-width: 100%;
+    }
+  }
+}
+
+.newButton {
+  width: 100%;
+  height: 225px;
+  color: @text-color-secondary;
+  background-color: @component-background;
+  border-color: @border-color-base;
+}
+
+.cardAvatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 48px;
+}
+
+.cardDescription {
+  .textOverflowMulti();
+}
+
+.modelForm {
+  :global {
+    .ant-modal-content {
+      .ant-modal-header {
+        background: #1890ff;
+        .ant-modal-title {
+          color: #fff;
+        }
+      }
+      .ant-modal-close {
+        .ant-modal-close-x {
+          .ant-modal-close-icon {
+            color: #fff;
+          }
+        }
+      }
+    }
+  }
+}
